@@ -1,4 +1,5 @@
 .gitignore
+.idea
 cache/
 .venv/
 old_main.py
