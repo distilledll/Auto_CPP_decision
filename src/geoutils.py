@@ -11,7 +11,7 @@ class GeoUtils:
         phi1 = math.radians(lat1); phi2 = math.radians(lat2)
         dphi = math.radians(lat2 - lat1); dl = math.radians(lon2 - lon1)
         hav = math.sin(dphi/2)**2 + math.cos(phi1)*math.cos(phi2)*math.sin(dl/2)**2
-        central = 2 * math.asin(min(1, math.sqrt(hav)))
+        central = 2 * math.asin(min(1.0, math.sqrt(hav)))
         return rad * central
 
     @staticmethod
