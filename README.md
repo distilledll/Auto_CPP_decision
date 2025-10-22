@@ -90,7 +90,7 @@ pip install -r requirements.txt
 1. Prepare the environment and dependencies (see previous section).
 2. Change the settings in the `main_script.py` file if necessary:
    * `district_name` — name
-* `custom_filter` — OSM filter for selecting road types.
+   * `custom_filter` — OSM filter for selecting road types.
    * Parameters for `SegmentMapGenerator.generate_segment_maps`: `max_km`, `step_m`, `densify_m`.
 4. Run:
 
@@ -106,6 +106,7 @@ The code uses several key settings. In short:
 
 * `district_name` — string for `osmnx.graph_from_place(...)`. For example: `“China-city, Moscow, Russia”`.
 * `custom_filter` — a string filter by OSM tags (by default, the main road types are selected).
+* `address` — the address of the first node in the graph, if None then the middle of the "terrain" is taken.
 * `undirected_penalty` (in `RoutePlanner`) — a penalty in meters added when using an undirected detour instead of a directed path (by default, it is large — to prefer directed routes).
 * `max_km` (in `SegmentMapGenerator.generate_segment_maps`) — maximum length of a “large segment” in kilometers when splitting.
 * `step_m` — step size (in meters) within a segment for turn-by-turn navigation (default is 400–500 m).

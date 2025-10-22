@@ -12,10 +12,13 @@ class CPPRoutePlanner:
     def __init__(self,
                  place_name: str,
                  custom_filter: Optional[str] = None,
-                 undirected_penalty: float = 1e6):
+                 undirected_penalty: float = 1e6,
+                 address: Optional[str] = None
+                 ):
         self.place_name = place_name
         self.custom_filter = custom_filter
         self.undirected_penalty = undirected_penalty
+        self.user_address = address
 
         # graph attributes
         self.original_graph: Optional[nx.MultiDiGraph] = None
@@ -31,7 +34,7 @@ class CPPRoutePlanner:
         self.shortest_pairs: Dict[Tuple[int,int], Tuple[float,bool]] = {}
 
     @staticmethod
-    def solve_min_cost_flow_with_ortools(self, digraph: nx.DiGraph, scale: int = 1000, default_capacity: int = 10 ** 9):
+    def solve_min_cost_flow_with_ortools(digraph: nx.DiGraph, scale: int = 1000, default_capacity: int = 10 ** 9):
         """
         Replace networkx.network_simplex with OR-Tools SimpleMinCostFlow.
         Inputs:
@@ -40,7 +43,7 @@ class CPPRoutePlanner:
         Returns:
           (total_cost_float, flow_dict) where flow_dict[u][v] = flow_amount (int).
         """
-        t0 = time.perf_counter()
+        #t0 = time.perf_counter()
 
         # map nodes to consecutive indices
         node_to_idx: Dict = {}
@@ -103,7 +106,7 @@ class CPPRoutePlanner:
                 flow_dict[u_node].setdefault(v_node, 0)
                 flow_dict[u_node][v_node] += int(f)
 
-        solve_time = time.perf_counter() - t0
+        #solve_time = time.perf_counter() - t0
         return total_cost, flow_dict
 
     def load_and_trim_graph(self):
@@ -123,19 +126,16 @@ class CPPRoutePlanner:
     def pick_center_node(self):
         """Pick a center node based on place name heuristics (keeps original logic)."""
         parts = self.place_name.split()
-        key = parts[0] if parts else ""
+        #key = parts[0] if parts else ""
         # heuristics from original script: specific addresses for known districts
         try:
-            if key == 'Лебедянский':
-                address = "ул. Мира, 14, Лебедянь, Липецкая область"
-            elif key == 'Данковский':
-                address = "ул. К. Маркса, 20, Данков, Липецкая область"
-            elif key == 'Краснинский':
-                address = "ул. Первомайская, 7, Красное, Липецкая область"
+            if self.user_address is not None:
+                address = self.user_address
+                lat, lon = ox.geocode(address)[0], ox.geocode(address)[1]
+                self.center_node = ox.distance.nearest_nodes(self.directed_graph, lon, lat)
             else:
-                address = f"Администрация {key} район"
-            lat, lon = ox.geocode(address)[0], ox.geocode(address)[1]
-            self.center_node = ox.distance.nearest_nodes(self.directed_graph, lon, lat)
+                nodes = list(self.directed_graph.nodes(data=True))
+                self.center_node = nodes[len(nodes) // 2][0]
         except Exception:
             # fallback to the graph centroid node
             nodes = list(self.directed_graph.nodes(data=True))
@@ -187,7 +187,7 @@ class CPPRoutePlanner:
 
         self.shortest_pairs = shortest_dist
         print(f"    Dijkstra calls: {dijkstra_calls}, total_dijkstra_time={total_dijkstra_time:.3f}s")
-        pairs_without_directed = sum(1 for (u,v),(d,was_undir) in shortest_dist.items() if was_undir and math.isfinite(d) and d>self.undirected_penalty)
+        pairs_without_directed = sum(1 for (u, v), (d, was_undir) in shortest_dist.items() if was_undir and math.isfinite(d) and d > self.undirected_penalty)
         print(f"    Pairs without directed path: {pairs_without_directed}")
 
     def build_auxiliary_flow_graph(self) -> nx.DiGraph:
@@ -222,7 +222,7 @@ class CPPRoutePlanner:
         print("[DIAG] Aux flow graph nodes:", aux.number_of_nodes(), "edges:", aux.number_of_edges())
         try:
             t0 = time.perf_counter()
-            total_cost, flow_dict = self.solve_min_cost_flow_with_ortools(self, aux)
+            total_cost, flow_dict = self.solve_min_cost_flow_with_ortools(aux)
             solve_time = time.perf_counter() - t0
             print(f"[TIMING] min-cost flow finished in {solve_time:.4f}s, cost={total_cost}")
         except Exception as exc:

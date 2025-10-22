@@ -1,3 +1,5 @@
 cashe/
 .venv/
 old_main.py
+*.html
+Карты_*/

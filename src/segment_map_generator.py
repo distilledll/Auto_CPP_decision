@@ -8,7 +8,7 @@ import networkx as nx
 import folium
 from folium.plugins import AntPath
 
-from geoutils import GeoUtils
+from src.geomutils import GeoUtils
 
 
 class SegmentMapGenerator:
@@ -96,8 +96,7 @@ class SegmentMapGenerator:
         return segments
 
     @staticmethod
-    def create_segment_map(self,
-                           full_route: List[Tuple[float,float]],
+    def create_segment_map(full_route: List[Tuple[float,float]],
                            segment_coords: List[Tuple[float,float]],
                            seg_index: int,
                            total: int,
@@ -136,7 +135,7 @@ class SegmentMapGenerator:
             folium.PolyLine(locations=seg, weight=5, opacity=0.6, tooltip=f"Segment {idx+1}").add_to(m)
         folium.PolyLine(locations=[(lat, lon) for lat, lon in full_route], weight=3, opacity=0.35, color="#888888").add_to(m)
         if len(dense) >= 2:
-            AntPath(locations=[dense[0], dense[-1]], delay=1, weight=1, color="#000", pulse_color="#000", opacity=0).add_to(m)
+            AntPath(locations=[dense[0], dense[-1]], delay=1, weight=1, color="#000", pulse_color="#000", opacity=1).add_to(m)
         folium.CircleMarker(location=segment_coords[0], radius=5, color="green", fill=True).add_to(m)
         folium.CircleMarker(location=segment_coords[-1], radius=5, color="blue", fill=True).add_to(m)
 
@@ -146,44 +145,81 @@ class SegmentMapGenerator:
         # insert interactive JS controls (prev/next/autoplay) and save final html + gpx
         steps_json = json.dumps(steps)
         js = f"""
-            <script>
-            var steps = {{steps_json}};
-            (function(){{
-                var mapVar = (typeof map !== 'undefined') ? map : null;
+        <script>
+        var steps = {steps_json};
+        (function(){{
+            // Найдём объект карты (folium даёт map_<id> или иногда map)
+            var mapVar = (typeof map !== 'undefined') ? map : null;
+            if(!mapVar){{
+                for(var k in window){{ if(k.indexOf('map_')===0){{ mapVar = window[k]; break; }} }}
+            }}
+
+            function initOnce(){{
                 if(!mapVar){{
-                    for(var k in window){{ if(k.indexOf('map_')===0){{ mapVar = window[k]; break; }} }}
+                    console.error('Map object not found (mapVar == null).');
+                    return;
                 }}
-                function initOnce(){{
-                    if(!mapVar) return;
-                    var currentStep = 0; var ant = null;
-                    var info = document.getElementById('seginfo');
-                    var prevbtn = document.getElementById('prevbtn');
-                    var nextbtn = document.getElementById('nextbtn');
-                    var autoplaybtn = document.getElementById('autoplaybtn');
-                    function showStep(i){{
-                        if(i<0 || i>=steps.length) return;
-                        currentStep = i;
-                        if(ant){{ try{{ mapVar.removeLayer(ant); }}catch(e){{}}; ant=null; }}
-                        ant = L.polyline.antPath(steps[i], {{ delay:800, dashArray:[10,20], weight:6, color:'#ff3333', pulseColor:'#ffffff' }});
-                        ant.addTo(mapVar);
-                        if(info) info.innerHTML = 'Step ' + (currentStep+1) + ' / ' + steps.length;
+                var currentStep = 0;
+                var ant = null;
+                var info = document.getElementById('seginfo');
+                var prevbtn = document.getElementById('prevbtn');
+                var nextbtn = document.getElementById('nextbtn');
+                var autoplaybtn = document.getElementById('autoplaybtn');
+
+                function showStep(i){{
+                    if(i<0 || i>=steps.length) return;
+                    currentStep = i;
+                    if(ant){{
+                        try{{ mapVar.removeLayer(ant); }} catch(e){{ console.warn(e); }}
+                        ant = null;
                     }}
-                    if(prevbtn) prevbtn.onclick = function(){{ if(currentStep>0) showStep(currentStep-1); }};
-                    if(nextbtn) nextbtn.onclick = function(){{ if(currentStep<steps.length-1) showStep(currentStep+1); }};
-                    document.addEventListener('keydown', function(e){{ if(e.key==='ArrowLeft'){{ if(currentStep>0) showStep(currentStep-1); }} else if(e.key==='ArrowRight'){{ if(currentStep<steps.length-1) showStep(currentStep+1); }});
-                    var autoplay=false, autoplayInterval=null;
-                    if(autoplaybtn) autoplaybtn.onclick = function(){{
-                        autoplay = !autoplay;
-                        var el = autoplaybtn;
-                        if(autoplay){{ el.innerText='Autoplay: ON'; autoplayInterval = setInterval(function(){{ if(currentStep<steps.length-1) showStep(currentStep+1); else{{ clearInterval(autoplayInterval); autoplay=false; el.innerText='Autoplay: OFF'; }} }}, 2500); }}
-                        else {{ el.innerText='Autoplay: OFF'; if(autoplayInterval) clearInterval(autoplayInterval); }}
-                    }};
-                    showStep(0);
+                    // Создаём antPath для шага и добавляем на карту
+                    ant = L.polyline.antPath(steps[i], {{
+                        delay: 800, dashArray: [10,20], weight: 6, color: '#ff3333', pulseColor: '#ffffff'
+                    }});
+                    ant.addTo(mapVar);
+                    if(info) info.innerHTML = 'Шаг ' + (currentStep+1) + ' / ' + steps.length;
                 }}
-                if(document.readyState === 'complete') initOnce(); else window.addEventListener('load', initOnce);
+
+                if(prevbtn) prevbtn.onclick = function(){{ if(currentStep>0) showStep(currentStep-1); }};
+                if(nextbtn) nextbtn.onclick = function(){{ if(currentStep<steps.length-1) showStep(currentStep+1); }};
+                document.addEventListener('keydown', function(e){{
+                    if(e.key==='ArrowLeft'){{ if(currentStep>0) showStep(currentStep-1); }}
+                    else if(e.key==='ArrowRight'){{ if(currentStep<steps.length-1) showStep(currentStep+1); }}
+                }});
+
+                var autoplay=false, autoplayInterval=null;
+                if(autoplaybtn) autoplaybtn.onclick = function(){{
+                    autoplay = !autoplay;
+                    var el = autoplaybtn;
+                    if(autoplay){{
+                        el.innerText = 'Autoplay: ON';
+                        autoplayInterval = setInterval(function(){{
+                            if(currentStep<steps.length-1) showStep(currentStep+1);
+                            else {{ clearInterval(autoplayInterval); autoplay=false; el.innerText='Autoplay: OFF'; }}
+                        }}, 2500);
+                    }} else {{ el.innerText = 'Autoplay: OFF'; if(autoplayInterval) clearInterval(autoplayInterval); }}
+                }};
+
+                showStep(0);
+                console.log('[Segment page] init done. steps=', steps.length);
+            }}
+
+                if(mapVar){{
+                    if(document.readyState === 'complete') initOnce(); else window.addEventListener('load', initOnce);
+                }} else {{
+                    window.addEventListener('load', function(){{
+                        // при загрузке пробуем ещё раз найти map_... переменную
+                        if(typeof map !== 'undefined') mapVar = map;
+                        else {{
+                            for(var k in window){{ if(k.indexOf('map_')===0){{ mapVar = window[k]; break; }} }}
+                        }}
+                        initOnce();
+                    }});
+                }}
             }})();
             </script>
-        """
+            """
         nav_html = f"""
             <div style="position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%); z-index:99999;
                         display:flex; gap:12px; align-items:center; background: rgba(255,255,255,0.92); padding:6px 10px; border-radius:10px;">

@@ -8,7 +8,7 @@ from src.segment_map_generator import SegmentMapGenerator
 
 if __name__ == "__main__":
     # Settings (edit as needed)
-    district_name = "Краснинский район, Липецкая область, Россия"
+    district_name = "Китай-город, Москва, Россия"
     custom_filter = (
         '["highway"~"motorway|trunk|primary|secondary|tertiary|unclassified|residential|service|living_street|road|track"]'
         '["motor_vehicle"!~"no"]["access"!~"private"]["service"!~"private"]'
