@@ -43,7 +43,7 @@ The project converts the OpenStreetMap road network into a reproducible Euler ro
 - **RoutePlanner** — main class: graph loading/processing, auxiliary graph construction, min-cost flow solution, working graph copy construction, Euler cycle retrieval, and complete geometry output.
 - **SegmentMapGenerator** — responsible for breaking down the complete route into segments, “densifying” points, creating interactive HTML pages and GPX.
 - **OR-Tools wrapper** — adaptation of input data NetworkX → SimpleMinCostFlow (cost scale, vertex indexing).
-- **Visualization** — folium + AntPath and embedded JS for step-by-step navigation.
+- **Visualization** — folium + AntPath and embedded JS for step-by-step navigation. ([Full_map](Карта_Китай-город.html), [Segments](Карты_Китай-город))
 
 ### Important design decisions / behavior
 
